@@ -1,708 +1,0 @@
-
-<div style="margin: 20px; text-align: center;">
-</div>
-<div id="result" style="margin-top: 20px;"></div>
-<!DOCTYPE html>
-
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>التحليل الرقمي القرآني</title>
-<link href="manifest.json" rel="manifest"/>
-<meta content="#2e7d32" name="theme-color"/>
-<!-- مكتبة Tailwind للتصميم -->
-<script src="https://cdn.tailwindcss.com"></script>
-<!-- خط Cairo من جوجل -->
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
-<!-- مكتبة PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<!-- مكتبة Cropper -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet"/>
-<style>
-    body {
-      font-family: 'Cairo', sans-serif;
-      transition: background-color 0.3s, color 0.3s;
-    }
-    .dark-mode {
-      background-color: #121212;
-      color: #e0e0e0;
-    }
-    .dark-mode textarea,
-    .dark-mode input,
-    .dark-mode button {
-      background-color: #1e1e1e !important;
-      color: #ffffff !important;
-      border-color: #444 !important;
-    }
-  </style>
-<script src="cmudict_full.js"></script>
-<script>
-// ربط الصوتيات بقيم رقمية
-const phonemeToValue = {
-  "AA": 1, "AE": 1, "AH": 1, "AO": 5, "AW": 5, "AY": 1,
-  "B": 9, "CH": 21, "D": 16, "DH": 17, "EH": 12, "ER": 8, "EY": 12,
-  "F": 13, "G": 27, "HH": 18, "IH": 6, "IY": 6, "JH": 19,
-  "K": 10, "L": 2, "M": 4, "N": 3, "NG": 3, "OW": 5, "OY": 6,
-  "P": 9, "R": 8, "S": 15, "SH": 21, "T": 11, "TH": 25,
-  "UH": 5, "UW": 5, "V": 13, "W": 5, "Y": 6, "Z": 24, "ZH": 24
-};
-
-function analyzeEnglishWord(word) {
-  if (!cmuDict) return { value: 0, detail: `${word} = [غير موجود في القاموس]` };
-  const phonemeStr = cmuDict[word.toUpperCase()];
-  if (!phonemeStr) return { value: 0, detail: `${word} = [غير موجود في القاموس]` };
-
-  const phonemes = phonemeStr.split(" ").map(p => p.replace(/[0-9]/g, ""));
-  let total = 0;
-  let details = [];
-  for (let ph of phonemes) {
-    const val = phonemeToValue[ph];
-    if (val !== undefined) {
-      total += val;
-      details.push(`${ph} = ${val}`);
-    } else {
-      details.push(`${ph} = غير معروف`);
-    }
-  }
-  return { value: total, detail: `${word} = ${total}<br>${details.join('<br>')}` };
-}
-
-// تعديل analyzeWords ليدمج التفاصيل والتنسيق العربي والإنجليزي
-function analyzeWords() {
-  const text = document.getElementById("inputText").value.trim();
-  const ignoreNumbers = document.getElementById("ignoreNumbers").checked;
-  const words = text.split(/\s+/);
-  let output = "<strong>تحليل الكلمات:</strong><br>";
-  let detailBlocks = [];
-
-  for (let word of words) {
-    const cleanWord = word.replace(/[ًٌٍَُِّْٰـ]/g, '');
-
-    if (/^[A-Za-z]+$/.test(cleanWord)) {
-      const result = analyzeEnglishWord(cleanWord);
-      output += result.detail + "<br>";
-      detailBlocks.push(result.detail);
-      continue;
-    }
-
-    let total = 0;
-    let details = [];
-    for (let char of cleanWord) {
-      if (ignoredChars.includes(char)) continue;
-      if (ignoreNumbers && /[0-9١-٩]/.test(char)) continue;
-      const value = values[char];
-      if (value !== undefined) {
-        total += value;
-        details.push(`${char} = ${value}`);
-      }
-    }
-    output += `${word} = ${total}<br>`;
-    if (details.length > 0) detailBlocks.push(`${word} = ${total}<br>` + details.join("<br>"));
-  }
-
-  document.getElementById("wordDetails").innerHTML = output;
-  const detailBox = document.getElementById("details");
-  if (detailBox) {
-    detailBox.innerHTML = "<strong>تفاصيل:</strong><br>" + detailBlocks.join("<hr class='my-2 border-green-200'>");
-  }
-}
-</script>
-</head>
-<button id="installBtn" onclick="installApp()" style="display:none; position:fixed; top:16px; right:16px; z-index:9999;
-               background-color:#2e7d32; color:white; padding:10px 14px; border:none;
-               border-radius:10px; font-size:14px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
-  تثبيت
-  </button>
-<body class="bg-[#fdfcf9] text-[#2e7d32] p-6" id="body">
-<div class="fixed top-4 left-4 z-50">
-<button class="bg-gray-800 text-white px-3 py-1 rounded-xl text-sm shadow-md hover:bg-gray-700" onclick="toggleDarkMode()">🌓 وضع الليل</button>
-</div>
-<div class="text-center py-16 max-w-xl mx-auto bg-white shadow-xl rounded-xl" id="introScreen">
-<div class="p-6">
-<h2 class="text-3xl font-bold mb-2">بسم الله الوكيل</h2>
-<h3 class="text-2xl font-semibold mb-1">تحليل رقمي</h3>
-<p class="text-lg font-semibold mb-4 text-yellow-600">✨ إلى اللانهاية نرتقي سويًا ∞</p>
-<p class="text-sm text-gray-700 leading-relaxed mb-4">
-      تحليل رقمي قرآني – لنكون من أصحاب الرقيم<br/>
-      إهداء محبة وتقدير للأستاذ المبارك: عبدالرحمن عمرو 🌿<br/>
-      تم تطوير هذه الأداة تعبيرًا عن الامتنان لما قدمه لنا من علم حق وفكر صمدي 🌿
-    </p>
-<input class="p-3 text-center border rounded-xl w-64 text-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4" id="passcodeInput" placeholder="رمز المرور" type="password"/>
-<br/>
-<button class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-6 rounded-xl text-lg" onclick="startApp()">
-      ابدأ التحليل
-    </button>
-<div class="text-red-600 mt-3 text-sm" id="errorMessage"></div>
-</div>
-</div>
-<div class="max-w-3xl mx-auto mt-8" id="mainApp" style="display: none;">
-<h2 class="text-2xl font-bold text-center mb-4">التحليل الرقمي القرآني 📖</h2>
-<div class="relative">
-<textarea class="w-full h-40 p-4 border-2 border-green-200 rounded-xl text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-green-400 resize-none" id="inputText" oninput="triggerAnalyze()" placeholder="أدخل نصًا قرآنيًا أو نصًا عاديًا..."></textarea>
-<!-- أزرار الكاميرا ورفع الصورة -->
-<div class="absolute bottom-2 right-2 flex gap-2" id="imageButtons">
-<button class="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded-xl text-sm shadow-md" id="cameraButton" onclick="openCamera()">
-<span class="text-lg">📸</span>
-</button>
-<button class="bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded-xl text-sm shadow-md" onclick="document.getElementById('imageUpload').click()">
-<span class="text-lg">📁</span>
-</button>
-<input accept="image/*" class="hidden" id="imageUpload" onchange="handleImageUpload(event)" type="file"/>
-</div>
-</div>
-<div class="flex flex-wrap justify-center gap-2 mb-4 mt-4">
-<button class="bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded-xl text-sm" onclick="toggleDetails()">
-      عرض/إخفاء التفاصيل
-    </button>
-<label class="flex items-center gap-2 text-green-800 text-sm font-medium">
-<input checked="" class="scale-125 accent-green-600" id="ignoreNumbers" onchange="triggerAnalyze()" type="checkbox"/> تجاهل الترقيم
-    </label>
-<button class="bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded-xl text-sm" onclick="copyResult()">
-      نسخ النتيجة 📋
-    </button>
-<button class="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-xl text-sm" onclick="downloadPDF()">
-      حفظ PDF 📄
-    </button>
-<!-- إدخال اسم أو رقم السورة -->
-<div class="text-center mt-6">
-<h4 class="text-lg font-semibold mb-2">📖 إدخال اسم أو رقم السورة</h4>
-<input class="w-64 p-2 border rounded-lg text-center mb-2" id="surahInput" placeholder="مثال: البقرة أو 2" type="text">
-<br/>
-<button class="bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded-xl mt-2 text-sm" onclick="fetchSurahByNameOrNumber()">
-    عرض السورة
-  </button>
-</input></div>
-<button class="bg-blue-700 hover:bg-blue-800 text-white py-2 px-4 rounded-xl text-sm" onclick="analyzeWords()">
-      تحليل كل كلمة 🔍
-    </button>
-</div>
-<div class="bg-green-50 border border-green-200 rounded-xl p-4 text-lg mb-4 text-gray-900" id="result"></div>
-<div class="text-sm text-gray-700 mb-4 hidden" id="details"></div>
-<div class="text-sm text-gray-800 mb-4" id="wordDetails"></div>
-<div class="mt-6 text-center">
-<h4 class="text-lg font-semibold mb-2">📖 عرض سورة أو آية في المصحف</h4>
-<input class="w-64 p-2 border rounded-lg text-center mb-2" id="suraName" placeholder="اسم أو رقم السورة" type="text"/>
-<input class="w-64 p-2 border rounded-lg text-center mb-2 ml-2" id="ayaNumber" min="1" placeholder="رقم الآية (اختياري)" type="number"/>
-<br/>
-<button class="bg-indigo-700 hover:bg-indigo-800 text-white py-2 px-4 rounded-xl mt-2 text-sm" onclick="openAyah()">
-      فتح في موقع quran.com 📖
-    </button>
-</div>
-</div>
-<script>
-// الوضع الليلي
-function toggleDarkMode() {
-  const body = document.getElementById("body");
-  body.classList.toggle("dark-mode");
-  localStorage.setItem("dark-mode", body.classList.contains("dark-mode") ? "on" : "off");
-}
-window.onload = function () {
-  if (localStorage.getItem("dark-mode") === "on") {
-    document.getElementById("body").classList.add("dark-mode");
-  }
-  window.onload = function () {
-  const urlParams = new URLSearchParams(window.location.search);
-  const action = urlParams.get("action");
-
-  if (action === "camera") {
-    // تجاوز واجهة الرمز
-    document.getElementById("introScreen").style.display = "none";
-    document.getElementById("mainApp").style.display = "block";
-
-    // تشغيل الكاميرا بعد الدخول
-    setTimeout(() => {
-      openCamera();
-    }, 500);
-  }
-
-  // الكود السابق داخل window.onload
-  if (localStorage.getItem("dark-mode") === "on") {
-    document.getElementById("body").classList.add("dark-mode");
-  }
-
-  const input = document.getElementById("inputText");
-  const imageButtons = document.getElementById("imageButtons");
-  input.addEventListener("input", () => {
-    imageButtons.style.display = input.value.trim() ? "none" : "flex";
-  });
-};
-  const input = document.getElementById("inputText");
-  const imageButtons = document.getElementById("imageButtons");
-  input.addEventListener("input", () => {
-    imageButtons.style.display = input.value.trim() ? "none" : "flex";
-  });
-}
-
-// الدخول بالرمز
-function startApp() {
-  const pass = document.getElementById("passcodeInput").value;
-  if (pass === "2222") {
-    document.getElementById("introScreen").style.display = "none";
-    document.getElementById("mainApp").style.display = "block";
-  } else {
-    document.getElementById("errorMessage").textContent = "رمز المرور غير صحيح";
-  }
-}
-document.getElementById("passcodeInput").addEventListener("keydown", function (event) {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    startApp();
-  }
-});
-
-// الكاميرا
-function openCamera() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "image/*";
-  input.capture = "environment";
-  input.onchange = (e) => handleImageUpload(e);
-  input.click();
-}
-
-// رفع الصورة
-function handleImageUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    showCropperModal(e.target.result, (croppedDataUrl) => {
-      showCountdown(() => {
-        analyzeImageOCR(croppedDataUrl);
-      });
-    });
-  };
-  reader.readAsDataURL(file);
-}
-
-// نافذة القص
-function showCropperModal(imageSrc, callback) {
-  const modal = document.createElement("div");
-  modal.style.position = "fixed";
-  modal.style.top = 0;
-  modal.style.left = 0;
-  modal.style.width = "100%";
-  modal.style.height = "100%";
-  modal.style.background = "rgba(0,0,0,0.8)";
-  modal.style.zIndex = 9999;
-  modal.innerHTML = `
-    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                background: white; padding: 10px; border-radius: 8px; max-width: 90%; max-height: 90%;">
-      <img id="cropImage" src="${imageSrc}" style="max-width:100%; max-height:400px;">
-      <div class="text-center mt-2">
-        <button id="cropBtn" class="bg-green-700 text-white px-4 py-1 rounded">تحليل النص المقصود</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  const image = modal.querySelector("#cropImage");
-  const cropper = new Cropper(image, {
-    viewMode: 1,
-    autoCropArea: 1,
-    responsive: true,
-  });
-
-  modal.querySelector("#cropBtn").onclick = () => {
-    const croppedCanvas = cropper.getCroppedCanvas();
-    const croppedImage = croppedCanvas.toDataURL("image/png");
-    document.body.removeChild(modal);
-    callback(croppedImage);
-  };
-}
-
-// العد التنازلي
-function showCountdown(callback) {
-  const countdownDiv = document.createElement("div");
-  countdownDiv.style.position = "fixed";
-  countdownDiv.style.top = "50%";
-  countdownDiv.style.left = "50%";
-  countdownDiv.style.transform = "translate(-50%, -50%)";
-  countdownDiv.style.fontSize = "48px";
-  countdownDiv.style.background = "#000";
-  countdownDiv.style.color = "#fff";
-  countdownDiv.style.padding = "20px";
-  countdownDiv.style.borderRadius = "20px";
-  countdownDiv.style.zIndex = 10000;
-  document.body.appendChild(countdownDiv);
-
-  let count = 4;
-  countdownDiv.innerText = count;
-  const interval = setInterval(() => {
-    count--;
-    countdownDiv.innerText = count;
-    if (count === 1) {
-      clearInterval(interval);
-      document.body.removeChild(countdownDiv);
-      callback();
-    }
-  }, 500); // 0.5s × 3 = 1.5s تقريبًا
-}
-
-async function analyzeImageOCR(base64Image) {
-  try {
-    const response = await fetch("https://vision.googleapis.com/v1/images:annotate?key=AIzaSyABPq_Qez1Q4Quen5SsFf1fz58ERRFtYlI", {
-      method: "POST",
-      body: JSON.stringify({
-        requests: [{
-          image: { content: base64Image.split(",")[1] },
-          features: [{ type: "TEXT_DETECTION" }]
-        }]
-      }),
-      headers: { "Content-Type": "application/json" }
-    });
-    const result = await response.json();
-    const text = result.responses[0].fullTextAnnotation.text;
-    document.getElementById("inputText").value = text;
-    analyze();
-  } catch (e) {
-    alert("فشل تحليل الصورة. حاول مرة أخرى.");
-  }
-}
-  const values = {
-  "٠": 0, "١": 1, "٢": 2, "٣": 3, "٤": 4, "٥": 5, "٦": 6, "٧": 7, "٨": 8, "٩": 9,
-  "A": 1, "a": 1, "B": 9, "b": 9, "C": 10, "c": 10, "D": 16, "d": 16,
-  "E": 12, "e": 12, "F": 13, "f": 13, "G": 27, "g": 27, "H": 7, "h": 7,
-  "I": 6, "i": 6, "J": 19, "j": 19, "K": 10, "k": 10, "L": 2, "l": 2,
-  "M": 4, "m": 4, "N": 3, "n": 3, "O": 5, "o": 5, "P": 9, "p": 9,
-  "Q": 14, "q": 14, "R": 8, "r": 8, "S": 15, "s": 15, "T": 11, "t": 11,
-  "U": 5, "u": 5, "V": 13, "v": 13, "W": 5, "w": 5, "X": 20, "x": 20,
-  "Y": 6, "y": 6, "Z": 24, "z": 24,
-  "أ": 1, "إ": 1, "آ": 1, "ء": 1, "ا": 1, "ى": 1, "ٱ": 1, "ب": 9, "ت": 11, "ث": 25,
-  "ج": 19, "ح": 18, "خ": 20, "د": 16, "ذ": 17, "ر": 8, "ز": 24, "س": 15, "ش": 21,
-  "ص": 22, "ض": 23, "ط": 26, "ظ": 28, "ع": 12, "غ": 27, "ف": 13, "ق": 14, "ك": 10,
-  "ل": 2, "م": 4, "ن": 3, "ه": 7, "هـ": 7, "ة": 7, "و": 5, "ؤ": 5, "ي": 6, "ئ": 6,
-  "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9
-};
-const ignoredChars = ['َ','ً','ُ','ٌ','ِ','ٍ','ْ','ّ','(',')','﴾','﴿','.',',','؛','؟','!','-','_','—','"',"'",'\n','\r','/','۝','۩','۞','ۚ','ۛ','ۖ','ۗ','ۘ','ۙ','ۜ','۟','۠','ۡ','ۢ','ۤ','ۥ','ۦ','ۧ','ۨ','۬','۫','۪','ۭ','ۯ','ٖ','ٗ','ٓ','ٔ','ٞ','ـ','ٰ','\u200c','\u200f'];
-
-function simplify(num) {
-  const steps = [];
-  while (num > 9) {
-    steps.push(num);
-    num = num.toString().split('').reduce((acc, d) => acc + parseInt(d), 0);
-  }
-  steps.push(num);
-  return steps;
-}
-
-function analyze() {
-  const text = document.getElementById("inputText").value;
-  const ignoreNumbers = document.getElementById("ignoreNumbers").checked;
-  let total = 0;
-  let details = [];
-  for (let char of text) {
-    if (char === ' ' || ignoredChars.includes(char)) {
-      if (char === ' ') details.push('&nbsp;&nbsp;');
-      continue;
-    }
-    if (ignoreNumbers && /[0-9١-٩]/.test(char)) continue;
-    const value = values[char];
-    if (value !== undefined) {
-      total += value;
-      details.push(`${char} = ${value}`);
-    } else {
-      details.push(`${char} = غير معروف`);
-    }
-  }
-  const steps = simplify(total);
-  const simplified = steps[steps.length - 1];
-  let html = "<strong>القيمة الكلية:</strong> " + total + "<br>";
-  if (steps.length > 1) {
-    html += "<strong>مراحل التبسيط:</strong><br>" + steps.slice(0, -1).map((s, i) => "المرحلة " + (i + 1) + ": " + s).join("<br>") + "<br>";
-  }
-  html += "<strong>التبسيط النهائي:</strong> " + simplified;
-  document.getElementById("result").innerHTML = html;
-  document.getElementById("details").innerHTML = "<strong>تفاصيل:</strong><br>" + details.join("<br>");
-}
-  function analyzeWords() {
-  const text = document.getElementById("inputText").value.trim();
-  const ignoreNumbers = document.getElementById("ignoreNumbers").checked;
-  const words = text.split(/\s+/);
-  let output = "<strong>تحليل الكلمات:</strong><br>";
-  for (let word of words) {
-    const cleanWord = word.replace(/[ًٌٍَُِّْٰـ]/g, '');
-    let total = 0;
-    for (let char of cleanWord) {
-      if (ignoredChars.includes(char)) continue;
-      if (ignoreNumbers && /[0-9١-٩]/.test(char)) continue;
-      const value = values[char];
-      if (value) total += value;
-    }
-    output += `${word} = ${total}<br>`;
-  }
-  document.getElementById("wordDetails").innerHTML = output;
-}
-
-function copyResult() {
-  const resultText = document.getElementById("result").innerText + "\n" + document.getElementById("details").innerText;
-  navigator.clipboard.writeText(resultText).then(() => alert("تم نسخ النتيجة!"));
-}
-
-function downloadPDF() {
-  const content = document.getElementById("mainApp");
-  const opt = {
-    margin: 0.5,
-    filename: 'تحليل_رقمي.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-  };
-  html2pdf().set(opt).from(content).save();
-}
-
-const surahNames = {
-  "الفاتحة":1,"البقرة":2,"آل عمران":3,"النساء":4,"المائدة":5,"الأنعام":6,"الأعراف":7,"الأنفال":8,"التوبة":9,"يونس":10,"هود":11,"يوسف":12,"الرعد":13,
-  "إبراهيم":14,"الحجر":15,"النحل":16,"الإسراء":17,"الكهف":18,"مريم":19,"طه":20,"الأنبياء":21,"الحج":22,"المؤمنون":23,"النور":24,"الفرقان":25,"الشعراء":26,
-  "النمل":27,"القصص":28,"العنكبوت":29,"الروم":30,"لقمان":31,"السجدة":32,"الأحزاب":33,"سبأ":34,"فاطر":35,"يس":36,"الصافات":37,"ص":38,"الزمر":39,"غافر":40,
-  "فصلت":41,"الشورى":42,"الزخرف":43,"الدخان":44,"الجاثية":45,"الأحقاف":46,"محمد":47,"الفتح":48,"الحجرات":49,"ق":50,"الذاريات":51,"الطور":52,"النجم":53,
-  "القمر":54,"الرحمن":55,"الواقعة":56,"الحديد":57,"المجادلة":58,"الحشر":59,"الممتحنة":60,"الصف":61,"الجمعة":62,"المنافقون":63,"التغابن":64,"الطلاق":65,
-  "التحريم":66,"الملك":67,"القلم":68,"الحاقة":69,"المعارج":70,"نوح":71,"الجن":72,"المزمل":73,"المدثر":74,"القيامة":75,"الإنسان":76,"المرسلات":77,"النبأ":78,
-  "النازعات":79,"عبس":80,"التكوير":81,"الإنفطار":82,"المطففين":83,"الانشقاق":84,"البروج":85,"الطارق":86,"الأعلى":87,"الغاشية":88,"الفجر":89,"البلد":90,
-  "الشمس":91,"الليل":92,"الضحى":93,"الشرح":94,"التين":95,"العلق":96,"القدر":97,"البينة":98,"الزلزلة":99,"العاديات":100,"القارعة":101,"التكاثر":102,
-  "العصر":103,"الهمزة":104,"الفيل":105,"قريش":106,"الماعون":107,"الكوثر":108,"الكافرون":109,"النصر":110,"المسد":111,"الإخلاص":112,"الفلق":113,"الناس":114
-};
-
-function openAyah() {
-  const suraInput = document.getElementById("suraName").value.trim();
-  const aya = document.getElementById("ayaNumber").value.trim();
-  const sura = surahNames[suraInput] || parseInt(suraInput);
-  if (!sura || sura < 1 || sura > 114) {
-    alert("يرجى إدخال اسم أو رقم سورة صحيح");
-    return;
-  }
-  const url = aya ? `https://quran.com/${sura}/${aya}` : `https://quran.com/${sura}`;
-  window.open(url, "_blank");
-}
-  </script>
-<div class="text-center text-sm text-gray-600 mt-16 mb-4 leading-relaxed">
-<p class="text-green-700 font-semibold">﴿ وَقُل رَّبِّ زِدْنِي عِلْمًا ﴾</p>
-<p>تم بحمد الله وتوفيقه</p>
-<p>بإشراف: <strong>عبدالرحمن عمرو</strong></p>
-<p>تطوير: <strong>حسن علي</strong></p>
-</div>
-<script>
-function toggleDetails() {
-  const details = document.getElementById("details");
-  if (details) {
-    details.classList.toggle("hidden");
-  }
-}
-
-function triggerAnalyze() {
-  if (typeof analyze === "function") {
-    analyze();
-  }
-}
-
-// كود تفعيل الكاميرا إذا وُجد ?action=camera في الرابط
-window.addEventListener("DOMContentLoaded", function () {
-  const urlParams = new URLSearchParams(window.location.search);
-  const action = urlParams.get("action");
-
-  if (action === "camera") {
-    setTimeout(() => {
-      openCamera();
-    }, 500); // تأخير خفيف للتأكد من تحميل الصفحة
-  }
-});
- window.addEventListener("load", function () {
-  const urlParams = new URLSearchParams(window.location.search);
-  const action = urlParams.get("action");
-
-  if (action === "camera") {
-    // تعبئة الرمز تلقائيًا وتشغيل الدخول
-    document.getElementById("passcodeInput").value = "2222";
-    startApp();
-
-    // ننتظر لحين عرض mainApp ثم نفتح الكاميرا
-    setTimeout(() => {
-      openCamera();
-    }, 800);
-  }
-}); 
-</script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-      .then(reg => console.log('✅ Service Worker مسجّل:', reg))
-      .catch(err => console.log('❌ فشل تسجيل Service Worker:', err));
-  }
-</script>
-<script>
-let deferredPrompt;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  console.log("✅ حدث beforeinstallprompt وصل");
-  e.preventDefault();
-  deferredPrompt = e;
-  const btn = document.getElementById("installBtn");
-  if (btn) btn.style.display = 'block';
-});
-
-function installApp() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('✅ تم التثبيت');
-      } else {
-        console.log('❌ رفض التثبيت');
-      }
-      deferredPrompt = null;
-    });
-  }
-}
-</script>
-<script>
-  const surahMap = {
-    "الفاتحة": 1, "البقرة": 2, "آل عمران": 3, "النساء": 4, "المائدة": 5, "الأنعام": 6,
-    "الأعراف": 7, "الأنفال": 8, "التوبة": 9, "يونس": 10, "هود": 11, "يوسف": 12, "الرعد": 13,
-    "إبراهيم": 14, "الحجر": 15, "النحل": 16, "الإسراء": 17, "الكهف": 18, "مريم": 19,
-    "طه": 20, "الأنبياء": 21, "الحج": 22, "المؤمنون": 23, "النور": 24, "الفرقان": 25,
-    "الشعراء": 26, "النمل": 27, "القصص": 28, "العنكبوت": 29, "الروم": 30, "لقمان": 31,
-    "السجدة": 32, "الأحزاب": 33, "سبأ": 34, "فاطر": 35, "يس": 36, "الصافات": 37, "ص": 38,
-    "الزمر": 39, "غافر": 40, "فصلت": 41, "الشورى": 42, "الزخرف": 43, "الدخان": 44,
-    "الجاثية": 45, "الأحقاف": 46, "محمد": 47, "الفتح": 48, "الحجرات": 49, "ق": 50,
-    "الذاريات": 51, "الطور": 52, "النجم": 53, "القمر": 54, "الرحمن": 55, "الواقعة": 56,
-    "الحديد": 57, "المجادلة": 58, "الحشر": 59, "الممتحنة": 60, "الصف": 61, "الجمعة": 62,
-    "المنافقون": 63, "التغابن": 64, "الطلاق": 65, "التحريم": 66, "الملك": 67, "القلم": 68,
-    "الحاقة": 69, "المعارج": 70, "نوح": 71, "الجن": 72, "المزمل": 73, "المدثر": 74,
-    "القيامة": 75, "الإنسان": 76, "المرسلات": 77, "النبأ": 78, "النازعات": 79, "عبس": 80,
-    "التكوير": 81, "الإنفطار": 82, "المطففين": 83, "الانشقاق": 84, "البروج": 85,
-    "الطارق": 86, "الأعلى": 87, "الغاشية": 88, "الفجر": 89, "البلد": 90, "الشمس": 91,
-    "الليل": 92, "الضحى": 93, "الشرح": 94, "التين": 95, "العلق": 96, "القدر": 97,
-    "البينة": 98, "الزلزلة": 99, "العاديات": 100, "القارعة": 101, "التكاثر": 102,
-    "العصر": 103, "الهمزة": 104, "الفيل": 105, "قريش": 106, "الماعون": 107,
-    "الكوثر": 108, "الكافرون": 109, "النصر": 110, "المسد": 111, "الإخلاص": 112,
-    "الفلق": 113, "الناس": 114
-  };
-
-  
-  async function fetchSurahByNameOrNumber() {
-    const input = document.getElementById("surahInput").value.trim();
-    if (!input) return alert("يرجى إدخال اسم أو رقم السورة");
-
-    let surahId = parseInt(input);
-    if (isNaN(surahId)) {
-      surahId = surahMap[input];
-    }
-
-    if (!surahId || surahId < 1 || surahId > 114) {
-      return alert("اسم أو رقم السورة غير صحيح");
-    }
-
-    try {
-      const res = await fetch(`https://api.alquran.cloud/v1/surah/${surahId}`);
-      const data = await res.json();
-      const allAyat = data.data.ayahs.map(v => v.text).join(' ');
-      document.getElementById("inputText").value = allAyat;
-      analyze(); // تشغيل التحليل تلقائيًا
-    } catch (err) {
-      alert("حدث خطأ أثناء تحميل السورة");
-    }
-  }
-
-
-    if (!surahId || surahId < 1 || surahId > 114) {
-      return alert("اسم أو رقم السورة غير صحيح");
-    }
-
-    try {
-      const res = await fetch(`https://api.quran.com/v4/quran/verses/uthmani?chapter_number=${surahId}`);
-      const data = await res.json();
-      const allAyat = data.verses.map(v => v.text_uthmani).join(' ');
-      document.getElementById("inputText").value = allAyat;
-      analyze(); // تشغيل التحليل
-    } catch (err) {
-      alert("حدث خطأ أثناء تحميل السورة");
-    }
-  }
-</script>
-<!-- 📖 إضافة إدخال اسم السورة -->
-<script>
-let surahsData = [];
-
-async function loadSurahs() {
-  try {
-    const res = await fetch("surahs_full.json");
-    surahsData = await res.json();
-  } catch (e) {
-    alert("حدث خطأ أثناء تحميل الملف");
-  }
-}
-
-loadSurahs();
-
-function getSurah(input) {
-  if (!surahsData.length) {
-    alert("البيانات غير جاهزة بعد");
-    return [];
-  }
-
-  input = input.trim().toLowerCase();
-  const surahIndex = parseInt(input);
-
-  return surahsData.filter(verse => {
-    if (!isNaN(surahIndex)) {
-      return verse.surah === surahIndex;
-    } else {
-      return verse.surah_name_ar && verse.surah_name_ar.trim().toLowerCase() === input;
-    }
-  });
-}
-
-function onFetchSurah() {
-  const userInput = document.getElementById("surahInput").value;
-  const verses = getSurah(userInput);
-
-  if (verses.length) {
-    document.getElementById("inputText").value = verses.map(v => v.text).join(" ");
-  } else {
-    alert("❌ لم يتم العثور على السورة");
-  }
-}
-</script>
-
-<script>
-  function loadSurah() {
-    const surahInput = document.getElementById("surahInput").value.trim();
-    fetch("surahs_full.json")
-      .then(res => res.json())
-      .then(data => {
-        const filtered = data.filter(ayah =>
-          ayah.surah == surahInput || ayah.surah_name_ar.includes(surahInput)
-        );
-        const text = filtered.map(a => a.text).join(" ");
-        document.getElementById("textInput").value = text;
-        analyzeText(); // يشغل التحليل تلقائيًا
-      })
-      .catch(err => {
-        alert("فشل تحميل السورة. تأكد من أن الملف surahs_full.json موجود.");
-        console.error(err);
-      });
-  }
-</script>
-<script>
-function loadSurahFromInput() {
-  const surahInput = document.getElementById("surahInput")?.value?.trim();
-  if (!surahInput) return alert("يرجى إدخال اسم أو رقم السورة");
-  const surahId = isNaN(surahInput) ? getSurahIdByName(surahInput) : parseInt(surahInput);
-  if (!surahId || !allSurahsData[surahId]) return alert("تعذر العثور على السورة");
-  loadSurah(surahId);
-}
-
-function getSurahIdByName(name) {
-  const normalized = name.trim().toLowerCase();
-  for (const key in allSurahsData) {
-    const verses = allSurahsData[key];
-    if (Array.isArray(verses) && verses[0]?.surah_name_ar?.trim()?.toLowerCase() === normalized) {
-      return parseInt(key);
-    }
-  }
-  return null;
-}
-</script>
-</body>
-</html>
